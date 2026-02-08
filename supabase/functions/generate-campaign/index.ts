@@ -119,37 +119,52 @@ serve(async (req) => {
 
     const styleDescriptions: Record<string, string> = {
       Photorealistic:
-        "photorealistic, high-end commercial photography, studio lighting, sharp details",
-      Neon: "neon lights, dark moody atmosphere, vibrant glowing colors, cyberpunk-inspired",
+        "photorealistic product photography, studio lighting, dramatic shadows, crisp focus, commercial advertising quality",
+      Neon: "neon lights, dark moody atmosphere, vibrant glowing colors, cyberpunk-inspired, electric accents, futuristic vibe",
       Pastel:
-        "soft pastel colors, minimalist, clean, gentle gradients, calming aesthetic",
+        "soft pastel colors, minimalist, clean, gentle gradients, calming aesthetic, airy whitespace",
       Luxury:
-        "luxury, gold accents, rich textures, premium feel, elegant composition, dark tones",
+        "luxury, gold accents, rich textures, premium feel, elegant composition, dark tones, velvet-like depth",
     };
 
     const styleDesc =
       styleDescriptions[visualStyle] || styleDescriptions.Photorealistic;
 
     const productSection = productContext
-      ? `\n\nIMPORTANT PRODUCT CONTEXT (from analyzing the uploaded product photo):\n${productContext}\nYou MUST incorporate this exact product into the scene naturally.`
+      ? `\n\nIMPORTANT PRODUCT CONTEXT (from analyzing the uploaded product photo):\n${productContext}\nYou MUST incorporate this exact product into the scene as the hero element. The product should be large, centered or slightly off-center, and dominate the composition.`
       : "";
 
     const promptEngineerMessages = [
       {
         role: "system",
-        content: `You are a Prompt Engineer for an AI image generator. Your goal is to write a single, detailed prompt that results in a 1080x1080 square marketing image. The image must:
-1. Feature the text "${headlineText}" rendered clearly and legibly as part of the design
+        content: `You are a world-class Graphic Designer and Prompt Engineer. You design professional marketing FLYER / POSTER images for social media ads. Your output is a single detailed prompt for an AI image generator.
+
+DESIGN PHILOSOPHY (inspired by professional ad flyers):
+- The product/subject is ALWAYS the hero — large, bold, and dominating the composition
+- Typography is BIG, BOLD, and IMPACTFUL — use oversized display fonts, mix weights (heavy headlines + light subtext)
+- The layout has clear visual hierarchy: hero text > product > supporting text > brand elements
+- Use dramatic contrast between background and foreground
+- Backgrounds should be rich, thematic, and context-appropriate (not plain/flat)
+- Include subtle design elements: geometric shapes, accent stripes, circular badges for offers, diagonal cuts
+- The overall feel should be polished, premium, and eye-catching — like a professional graphic designer made it in Photoshop
+
+The image must:
+1. Feature the text "${headlineText}" as MASSIVE, bold display typography — this is the most important visual element
 2. Match the visual style: ${styleDesc}
-3. Use the brand color ${brandColor} as a dominant accent
-4. Be suitable for a ${theme}-themed ${industry} marketing campaign for the brand "${brandName}"
-5. Look professional and eye-catching for social media
+3. Use ${brandColor} as the dominant brand accent color throughout
+4. Be a ${theme}-themed ${industry} marketing flyer for "${brandName}"
+5. Look like a professionally designed promotional flyer/poster, NOT a stock photo
+6. Include a clear visual hierarchy with the headline text, product, and brand name "${brandName}"
+7. Use dramatic composition with the product as the centerpiece
 
 Rules:
 - Output ONLY the prompt text, nothing else
-- Do NOT include instructions like "generate" or "create" — just describe the scene
-- The text "${headlineText}" must appear spelled correctly and be the focal point
-- Keep the prompt under 200 words
-- Describe specific composition, lighting, typography style, and visual elements`,
+- Do NOT use words like "generate" or "create" — describe the final design as if it exists
+- The text "${headlineText}" MUST appear spelled correctly in huge bold typography
+- The brand name "${brandName}" should appear smaller but clearly visible
+- Keep the prompt under 250 words
+- Describe: composition layout, background treatment, typography style/size/weight, lighting, color palette, decorative elements, and product placement
+- Think of this as a flyer you'd see on Instagram or a billboard — bold, punchy, and impossible to scroll past`,
       },
       {
         role: "user",
@@ -160,7 +175,7 @@ Headline Text: "${headlineText}"
 Visual Style: ${visualStyle}
 Brand Color: ${brandColor}${productSection}
 
-Write the image generation prompt now.`,
+Design a professional marketing flyer prompt now.`,
       },
     ];
 
@@ -186,7 +201,7 @@ Write the image generation prompt now.`,
       messages: [
         {
           role: "user",
-          content: imagenPrompt,
+          content: `Create a professional 1080x1080 square marketing flyer/poster design. This should look like it was made by a professional graphic designer — bold typography, dramatic composition, and polished layout.\n\n${imagenPrompt}`,
         },
       ],
       modalities: ["image", "text"],
