@@ -166,7 +166,7 @@ const BuilderSection = ({ sectionRef }: BuilderSectionProps) => {
   const inputClasses =
     "w-full bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-border))] p-3 px-4 rounded-xl text-foreground font-sans text-sm outline-none transition-colors duration-300 focus:border-accent-violet";
   const labelClasses = "block text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground mb-2";
-  const selectClasses = `${inputClasses} appearance-none cursor-pointer`;
+  const selectClasses = `${inputClasses} cursor-pointer [&>option]:bg-[hsl(240,20%,6%)] [&>option]:text-white [&>option]:py-2`;
 
   return (
     <section ref={sectionRef} className="py-24 px-6">
