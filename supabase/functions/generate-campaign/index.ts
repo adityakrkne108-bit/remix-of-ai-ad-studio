@@ -137,45 +137,49 @@ serve(async (req) => {
     const promptEngineerMessages = [
       {
         role: "system",
-        content: `You are a world-class Graphic Designer and Prompt Engineer. You design professional marketing FLYER / POSTER images for social media ads. Your output is a single detailed prompt for an AI image generator.
+        content: `You are a world-class Graphic Designer who creates award-winning marketing flyers and posters. Your task: write ONE detailed prompt for an AI image generator to produce a stunning promotional flyer.
 
-DESIGN PHILOSOPHY (inspired by professional ad flyers):
-- The product/subject is ALWAYS the hero — large, bold, and dominating the composition
-- Typography is BIG, BOLD, and IMPACTFUL — use oversized display fonts, mix weights (heavy headlines + light subtext)
-- The layout has clear visual hierarchy: hero text > product > supporting text > brand elements
-- Use dramatic contrast between background and foreground
-- Backgrounds should be rich, thematic, and context-appropriate (not plain/flat)
-- Include subtle design elements: geometric shapes, accent stripes, circular badges for offers, diagonal cuts
-- The overall feel should be polished, premium, and eye-catching — like a professional graphic designer made it in Photoshop
+MANDATORY DESIGN RULES:
+1. TYPOGRAPHY IS KING:
+   - The headline "${headlineText}" MUST be the dominant visual — rendered in MASSIVE, ultra-bold display typography (at least 40% of the composition)
+   - Use dramatic font treatments: 3D extrusion, metallic finishes, neon glow, gradient fills, or embossed effects
+   - Brand name "${brandName}" appears smaller but styled consistently
+   - ALL text must be spelled EXACTLY as provided
 
-The image must:
-1. Feature the text "${headlineText}" as MASSIVE, bold display typography — this is the most important visual element
-2. Match the visual style: ${styleDesc}
-3. Use ${brandColor} as the dominant brand accent color throughout
-4. Be a ${theme}-themed ${industry} marketing flyer for "${brandName}"
-5. Look like a professionally designed promotional flyer/poster, NOT a stock photo
-6. Include a clear visual hierarchy with the headline text, product, and brand name "${brandName}"
-7. Use dramatic composition with the product as the centerpiece
+2. PRODUCT AS HERO:
+   - The product is the second focal point, positioned prominently (floating, angled dynamically, or on a pedestal)
+   - Lit with cinematic studio lighting — sharp highlights, controlled shadows, rim lighting for depth
+   - Product should feel tangible and premium
 
-Rules:
-- Output ONLY the prompt text, nothing else
-- Do NOT use words like "generate" or "create" — describe the final design as if it exists
-- The text "${headlineText}" MUST appear spelled correctly in huge bold typography
-- The brand name "${brandName}" should appear smaller but clearly visible
-- Keep the prompt under 250 words
-- Describe: composition layout, background treatment, typography style/size/weight, lighting, color palette, decorative elements, and product placement
-- Think of this as a flyer you'd see on Instagram or a billboard — bold, punchy, and impossible to scroll past`,
+3. BACKGROUND & ATMOSPHERE:
+   - Rich, layered background — NOT flat or plain. Use: gradient meshes, textured surfaces (velvet, concrete, brushed metal), atmospheric fog, bokeh, or environmental context
+   - Brand color ${brandColor} woven throughout as accent: in lighting, gradients, decorative elements, and typography highlights
+
+4. LAYOUT & COMPOSITION:
+   - Professional graphic design layout with clear Z-pattern or F-pattern visual flow
+   - Add design accents: geometric shapes, diagonal slashes, circular offer badges, thin rule lines, floating particles or confetti
+   - Strong contrast between foreground elements and background
+   - Include a promotional badge/sticker element (e.g., "LIMITED TIME", percentage off, etc.)
+
+5. STYLE: ${styleDesc}
+6. THEME: ${theme}-themed for ${industry}
+
+OUTPUT RULES:
+- Output ONLY the prompt text — no explanations, no prefixes
+- Describe the final design as if photographing an existing poster
+- Under 200 words
+- Do NOT use words like "generate" or "create"`,
       },
       {
         role: "user",
         content: `Brand: ${brandName}
 Industry: ${industry}
-Theme/Occasion: ${theme}
-Headline Text: "${headlineText}"
-Visual Style: ${visualStyle}
-Brand Color: ${brandColor}${productSection}
+Theme: ${theme}
+Headline: "${headlineText}"
+Style: ${visualStyle}
+Color: ${brandColor}${productSection}
 
-Design a professional marketing flyer prompt now.`,
+Write the flyer design prompt.`,
       },
     ];
 
@@ -201,7 +205,7 @@ Design a professional marketing flyer prompt now.`,
       messages: [
         {
           role: "user",
-          content: `Create a professional 1080x1080 square marketing flyer/poster design. This should look like it was made by a professional graphic designer — bold typography, dramatic composition, and polished layout.\n\n${imagenPrompt}`,
+          content: `Design a premium 1080x1080 square promotional flyer. This must look like a polished, print-ready marketing poster with bold typography, dramatic product placement, and professional graphic design composition. Every element should feel intentional and high-end.\n\n${imagenPrompt}`,
         },
       ],
       modalities: ["image", "text"],
@@ -233,23 +237,18 @@ Design a professional marketing flyer prompt now.`,
         messages: [
           {
             role: "system",
-            content: `You are an expert social media copywriter. Generate a compelling social media caption for a marketing post. The caption should:
-1. Be engaging and on-brand
-2. Include 2-3 relevant hashtags at the end
-3. Be between 50-150 words
-4. Match the tone of the campaign theme
-5. Include a clear call to action
-Output ONLY the caption text, nothing else.`,
+            content: `You write punchy social media captions. Rules:
+- Maximum 2 short sentences (under 25 words total)
+- End with 2-3 hashtags
+- Include one emoji
+- Be bold and direct — no filler words
+- Output ONLY the caption, nothing else.`,
           },
           {
             role: "user",
-            content: `Brand: ${brandName}
-Industry: ${industry}
-Theme/Occasion: ${theme}
-Main Headline: "${headlineText}"
-Visual Style: ${visualStyle}
+            content: `Brand: ${brandName} | Theme: ${theme} | Headline: "${headlineText}"
 
-Write a matching social media caption.`,
+Write a short, punchy caption.`,
           },
         ],
       });
