@@ -125,7 +125,11 @@ const BuilderSection = ({ sectionRef }: BuilderSectionProps) => {
 
         clearInterval(stepTimer);
 
-        if (error) throw error;
+        if (error) {
+          // Edge function invocation errors may contain status info
+          const errMsg = typeof error === "object" && error.message ? error.message : String(error);
+          throw new Error(errMsg);
+        }
         if (data?.error) throw new Error(data.error);
 
         setCurrentStep(3);

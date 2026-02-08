@@ -2,8 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
+
+const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const TEXT_MODEL = "google/gemini-3-flash-preview";
+const IMAGE_MODEL = "google/gemini-2.5-flash-image";
 
 interface CampaignRequest {
   brandName: string;
@@ -16,8 +21,47 @@ interface CampaignRequest {
   productImageMimeType?: string;
 }
 
+/** Shared helper to call the Lovable AI Gateway and handle common errors */
+async function callGateway(
+  apiKey: string,
+  body: Record<string, unknown>
+): Promise<Response> {
+  const resp = await fetch(GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    console.error(`Gateway error [${resp.status}]:`, errBody);
+
+    if (resp.status === 429) {
+      throw Object.assign(new Error("Rate limit exceeded. Please try again shortly."), { status: 429 });
+    }
+    if (resp.status === 402) {
+      throw Object.assign(new Error("AI credits exhausted. Please add credits."), { status: 402 });
+    }
+    throw Object.assign(new Error(`AI gateway error: ${resp.status}`), { status: 500 });
+  }
+
+  return resp;
+}
+
+/** Build an error Response with CORS */
+function errorResponse(message: string, status = 500) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: corsHeaders });
 
   try {
     const {
@@ -31,53 +75,37 @@ serve(async (req) => {
       productImageMimeType,
     }: CampaignRequest = await req.json();
 
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // ============================
-    // STEP 1: Analyze product image via OpenRouter Vision (if provided)
+    // STEP 1: Analyze product image (if provided)
     // ============================
     let productContext = "";
 
     if (productImageBase64 && productImageMimeType) {
       console.log("Step 1: Analyzing product image with vision...");
 
-      const visionMessages: any[] = [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `You are an expert product analyst. Analyze this product image in detail. Describe the product, its colors, textures, materials, shape, and any notable features. Be specific and vivid so a text-to-image AI can recreate this product accurately in a new scene. Keep your description to 3-4 sentences.`,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${productImageMimeType};base64,${productImageBase64}`,
+      const visionResp = await callGateway(LOVABLE_API_KEY, {
+        model: TEXT_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `You are an expert product analyst. Analyze this product image in detail. Describe the product, its colors, textures, materials, shape, and any notable features. Be specific and vivid so a text-to-image AI can recreate this product accurately in a new scene. Keep your description to 3-4 sentences.`,
               },
-            },
-          ],
-        },
-      ];
-
-      const visionResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash-001",
-          messages: visionMessages,
-          max_tokens: 500,
-        }),
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${productImageMimeType};base64,${productImageBase64}`,
+                },
+              },
+            ],
+          },
+        ],
       });
-
-      if (!visionResp.ok) {
-        const errText = await visionResp.text();
-        console.error("Vision API error:", visionResp.status, errText);
-        throw new Error(`Vision analysis failed: ${visionResp.status}`);
-      }
 
       const visionData = await visionResp.json();
       productContext = visionData.choices?.[0]?.message?.content || "";
@@ -85,18 +113,22 @@ serve(async (req) => {
     }
 
     // ============================
-    // STEP 2: Engineer a prompt for image generation via OpenRouter
+    // STEP 2: Engineer image generation prompt
     // ============================
     console.log("Step 2: Engineering image generation prompt...");
 
     const styleDescriptions: Record<string, string> = {
-      Photorealistic: "photorealistic, high-end commercial photography, studio lighting, sharp details",
+      Photorealistic:
+        "photorealistic, high-end commercial photography, studio lighting, sharp details",
       Neon: "neon lights, dark moody atmosphere, vibrant glowing colors, cyberpunk-inspired",
-      Pastel: "soft pastel colors, minimalist, clean, gentle gradients, calming aesthetic",
-      Luxury: "luxury, gold accents, rich textures, premium feel, elegant composition, dark tones",
+      Pastel:
+        "soft pastel colors, minimalist, clean, gentle gradients, calming aesthetic",
+      Luxury:
+        "luxury, gold accents, rich textures, premium feel, elegant composition, dark tones",
     };
 
-    const styleDesc = styleDescriptions[visualStyle] || styleDescriptions.Photorealistic;
+    const styleDesc =
+      styleDescriptions[visualStyle] || styleDescriptions.Photorealistic;
 
     const productSection = productContext
       ? `\n\nIMPORTANT PRODUCT CONTEXT (from analyzing the uploaded product photo):\n${productContext}\nYou MUST incorporate this exact product into the scene naturally.`
@@ -132,125 +164,92 @@ Write the image generation prompt now.`,
       },
     ];
 
-    const promptResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
-        messages: promptEngineerMessages,
-        max_tokens: 400,
-      }),
+    const promptResp = await callGateway(LOVABLE_API_KEY, {
+      model: TEXT_MODEL,
+      messages: promptEngineerMessages,
     });
 
-    if (!promptResp.ok) {
-      const errText = await promptResp.text();
-      console.error("Prompt engineering error:", promptResp.status, errText);
-      throw new Error(`Prompt engineering failed: ${promptResp.status}`);
-    }
-
     const promptData = await promptResp.json();
-    const imagenPrompt = promptData.choices?.[0]?.message?.content?.trim() || "";
+    const imagenPrompt =
+      promptData.choices?.[0]?.message?.content?.trim() || "";
     console.log("Engineered prompt:", imagenPrompt);
 
     if (!imagenPrompt) throw new Error("Failed to generate image prompt");
 
     // ============================
-    // STEP 3: Generate image via OpenRouter (sourceful/riverflow-v2-pro)
+    // STEP 3: Generate image with Nano Banana
     // ============================
-    console.log("Step 3: Generating image with sourceful/riverflow-v2-pro...");
+    console.log("Step 3: Generating image with Nano Banana (gemini-2.5-flash-image)...");
 
-    const imageGenResp = await fetch("https://openrouter.ai/api/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sourceful/riverflow-v2-pro",
-        prompt: imagenPrompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "b64_json",
-      }),
+    const imageResp = await callGateway(LOVABLE_API_KEY, {
+      model: IMAGE_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: imagenPrompt,
+        },
+      ],
+      modalities: ["image", "text"],
     });
 
-    if (!imageGenResp.ok) {
-      const errText = await imageGenResp.text();
-      console.error("Image generation error:", imageGenResp.status, errText);
-      throw new Error(`Image generation failed: ${imageGenResp.status} - ${errText}`);
+    const imageData = await imageResp.json();
+    const imageUrl =
+      imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+    if (!imageUrl) {
+      console.error(
+        "Unexpected image response structure:",
+        JSON.stringify(imageData).slice(0, 500)
+      );
+      throw new Error("No image was generated. Please try again.");
     }
 
-    const imageGenData = await imageGenResp.json();
-    console.log("Image gen response keys:", Object.keys(imageGenData));
-
-    // Handle both OpenAI-style responses
-    let imageDataUrl = "";
-    if (imageGenData.data?.[0]?.b64_json) {
-      imageDataUrl = `data:image/png;base64,${imageGenData.data[0].b64_json}`;
-    } else if (imageGenData.data?.[0]?.url) {
-      imageDataUrl = imageGenData.data[0].url;
-    } else {
-      console.error("Unexpected image gen response:", JSON.stringify(imageGenData).slice(0, 500));
-      throw new Error("No image was generated");
-    }
+    console.log("Image generated successfully (data URL length:", imageUrl.length, ")");
 
     // ============================
-    // STEP 4: Generate matching caption via OpenRouter
+    // STEP 4: Generate matching caption
     // ============================
     console.log("Step 4: Generating social media caption...");
 
-    const captionMessages = [
-      {
-        role: "system",
-        content: `You are an expert social media copywriter. Generate a compelling social media caption for a marketing post. The caption should:
+    let caption = "";
+    try {
+      const captionResp = await callGateway(LOVABLE_API_KEY, {
+        model: TEXT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert social media copywriter. Generate a compelling social media caption for a marketing post. The caption should:
 1. Be engaging and on-brand
 2. Include 2-3 relevant hashtags at the end
 3. Be between 50-150 words
 4. Match the tone of the campaign theme
 5. Include a clear call to action
 Output ONLY the caption text, nothing else.`,
-      },
-      {
-        role: "user",
-        content: `Brand: ${brandName}
+          },
+          {
+            role: "user",
+            content: `Brand: ${brandName}
 Industry: ${industry}
 Theme/Occasion: ${theme}
 Main Headline: "${headlineText}"
 Visual Style: ${visualStyle}
 
 Write a matching social media caption.`,
-      },
-    ];
+          },
+        ],
+      });
 
-    const captionResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
-        messages: captionMessages,
-        max_tokens: 300,
-      }),
-    });
-
-    let caption = "";
-    if (captionResp.ok) {
       const captionData = await captionResp.json();
       caption = captionData.choices?.[0]?.message?.content?.trim() || "";
-    } else {
-      console.warn("Caption generation failed, continuing without caption");
+    } catch (captionErr) {
+      console.warn("Caption generation failed, continuing without caption:", captionErr);
     }
 
     console.log("Campaign generation complete!");
 
     return new Response(
       JSON.stringify({
-        imageUrl: imageDataUrl,
+        imageUrl,
         caption,
         prompt: imagenPrompt,
       }),
@@ -258,14 +257,10 @@ Write a matching social media caption.`,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (e) {
+  } catch (e: any) {
     console.error("generate-campaign error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    const status = e?.status || 500;
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return errorResponse(message, status);
   }
 });
